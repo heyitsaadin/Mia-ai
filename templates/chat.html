@@ -130,6 +130,7 @@
         .desk-status    { display:flex; align-items:center; gap:5px; margin-top:2px; }
         .desk-dot       { width:7px; height:7px; background:#10b981; border-radius:50%; animation:pulse 2s infinite; }
         .desk-status span { font-size:10px; color:#10b981; font-weight:800; letter-spacing:.5px; }
+        .desk-username { font-size:11px; font-weight:700; color:#9ca3af; letter-spacing:.5px; padding:2px 0 4px; border-bottom:1px solid var(--light); }
         hr.desk-divider { border:none; border-top:1px solid var(--light); }
         .desk-label     { font-size:10px; font-weight:700; color:#9ca3af; letter-spacing:1px; text-transform:uppercase; margin-bottom:8px; }
         .desk-shortcuts { display:flex; flex-direction:column; gap:6px; }
@@ -139,21 +140,24 @@
         .desk-logout { display:block; text-align:center; color:var(--red); text-decoration:none; font-size:12px; font-weight:700; padding:9px; border-radius:10px; border:1.5px solid var(--red); position:relative; }
         .desk-logout:hover { background:#fee2e2; }
 
-        /* ── Logout red dot indicator ── */
-        .logout-dot {
-            display: inline-block;
-            width: 8px; height: 8px;
-            background: var(--red);
+        /* ── Logout loading spinner ── */
+        @keyframes logoutSpin { to { transform: rotate(360deg); } }
+        .logout-spinner {
+            display: none;
+            width: 13px; height: 13px;
+            border: 2px solid rgba(239,68,68,.25);
+            border-top-color: var(--red);
             border-radius: 50%;
-            margin-left: 6px;
-            vertical-align: middle;
-            animation: logoutPulse 1.4s ease-in-out infinite;
+            animation: logoutSpin .7s linear infinite;
+            flex-shrink: 0;
         }
-        @keyframes logoutPulse {
-            0%   { box-shadow: 0 0 0 0 rgba(239,68,68,.8); transform: scale(1); }
-            50%  { box-shadow: 0 0 0 5px rgba(239,68,68,0); transform: scale(1.15); }
-            100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); transform: scale(1); }
+        .desk-logout {
+            display: flex; align-items: center; justify-content: center; gap: 7px;
         }
+        .desk-logout.loading { pointer-events: none; opacity: .65; }
+        .desk-logout.loading .logout-spinner { display: inline-block; }
+        .ham-item.danger.loading { pointer-events: none; opacity: .65; }
+        .ham-item.danger.loading .logout-spinner { display: inline-block; }
         .desk-tag { text-align:center; font-size:9px; color:#9ca3af; letter-spacing:1.5px; }
         .desk-tag span { color:#4b5563; font-weight:bold; }
         .desk-main  { flex:1; display:flex; flex-direction:column; background:var(--bg); }
@@ -237,9 +241,9 @@
                     Developer
                 </button>
                 <hr class="ham-divider">
-                <a class="ham-item danger" href="/logout">
+                <a class="ham-item danger" href="/logout" onclick="triggerLogout(this)">
                     <svg class="ham-icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                    Logout<span class="logout-dot"></span>
+                    Logout<span class="logout-spinner"></span>
                 </a>
             </div>
         </div>
@@ -273,6 +277,7 @@
                 <div class="desk-status"><div class="desk-dot"></div><span>ONLINE</span></div>
             </div>
         </div>
+        <div class="desk-username">{{ username }}</div>
         <hr class="desk-divider">
         <div>
             <div class="desk-label">Quick Actions</div>
@@ -285,7 +290,7 @@
         <div class="desk-footer">
             <button class="desk-sc" onclick="openModal('aboutModal')" style="text-align:center;">ℹ About Jarvis</button>
             <button class="desk-sc" onclick="openModal('devModal')"  style="text-align:center;">👤 Developer</button>
-            <a href="/logout" class="desk-logout">Logout<span class="logout-dot"></span></a>
+            <a href="/logout" class="desk-logout" id="deskLogout" onclick="triggerLogout(this)">Logout<span class="logout-spinner"></span></a>
             <p class="desk-tag">Created By <span>AADIN</span></p>
         </div>
     </div>
@@ -433,6 +438,11 @@
         else if (del && ci===0)      { del=false; pi=(pi+1)%phrases.length; spd=400; }
         setTimeout(typeLoop, spd);
     }
+    // ── Logout loading state ──
+    function triggerLogout(el) {
+        el.classList.add('loading');
+    }
+
     typeLoop();
 </script>
 </body>
