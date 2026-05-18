@@ -1185,6 +1185,21 @@ def send_image():
         return jsonify({"reply": f"Error: {str(e)}"})
 
 
+@app.errorhandler(404)
+def not_found(e):
+    return render_template("error.html", error_code=404), 404
+
+@app.errorhandler(500)
+def server_error(e):
+    return render_template("error.html", error_code=500), 500
+
+@app.errorhandler(Exception)
+def unhandled_exception(e):
+    # catches any uncaught crash
+    app.logger.error(f"Unhandled exception: {e}")
+    return render_template("error.html", error_code=500), 500
+
+
 init_db()
 
 if __name__ == "__main__":
