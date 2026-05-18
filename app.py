@@ -49,7 +49,7 @@ IMAGE_TRIGGERS = [
 
 
 # ──────────────────────────────────────────────
-# GREETING
+# GREETINGS
 # ──────────────────────────────────────────────
 
 def get_greeting(username):
