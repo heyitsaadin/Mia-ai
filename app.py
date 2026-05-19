@@ -1147,50 +1147,138 @@ def send_image():
         return jsonify({"error": "not_logged_in"}), 401
     heartbeat(session["user"])
 
-    image_file = request.files.get("image")
+    image_file  = request.files.get("image")
+    image_file2 = request.files.get("image2")
     caption = request.form.get("caption", "").strip()
 
     if not image_file:
-        return jsonify({"error": "No image provided"}), 400
+        return jsonify({"reply": "No image provided!"}), 400
 
     try:
         import base64
+
+        # ── encode image(s) ──────────────────────────────────────
         img_bytes = image_file.read()
-        b64 = base64.b64encode(img_bytes).decode("utf-8")
-        mime = image_file.content_type or "image/jpeg"
+        b64       = base64.b64encode(img_bytes).decode("utf-8")
+        mime      = image_file.content_type or "image/jpeg"
 
-        prompt = caption if caption else "Describe this image in detail."
-        key = os.environ.get("GROQ_API_KEY_2", "")
+        img_bytes2 = b64_2 = mime2 = None
+        if image_file2 and image_file2.filename:
+            img_bytes2 = image_file2.read()
+            b64_2      = base64.b64encode(img_bytes2).decode("utf-8")
+            mime2      = image_file2.content_type or "image/jpeg"
 
-        res = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-            json={
-                "model": "meta-llama/llama-4-scout-17b-16e-instruct",
-                "messages": [{
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}}
-                    ]
-                }],
-                "max_tokens": 500
-            },
-            timeout=30
-        )
-        reply = res.json()["choices"][0]["message"]["content"].strip()
+        groq_key  = os.environ.get("GROQ_API_KEY_2", "")
+        nvapi_key = os.environ.get("NVIDIA_API_KEY", "")
+
+        # ── step 1: ask Groq to classify intent ─────────────────
+        # Only do this if there's a caption, otherwise default to analyse
+        intent = "analyse"
+        short_prompt = caption
+
+        if caption:
+            classify_res = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+                json={
+                    "model": "llama-3.1-8b-instant",
+                    "messages": [
+                        {"role": "system", "content": (
+                            "You are a classifier. The user has uploaded an image and written a caption. "
+                            "Decide if they want to ANALYSE the image (describe, identify, explain, ask questions about it) "
+                            "or EDIT the image (modify, change, transform, add/remove something, swap, combine with another image, make it funny, etc). "
+                            "If they want to edit, also produce a short clean image-editing instruction (under 20 words) based on their caption. "
+                            "Reply ONLY in this exact JSON format with no markdown: "
+                            "{\"intent\":\"analyse\" or \"edit\", \"edit_prompt\":\"short editing instruction or empty string\"}"
+                        )},
+                        {"role": "user", "content": f"Caption: {caption}. Two images uploaded: {'yes' if b64_2 else 'no'}"}
+                    ],
+                    "max_tokens": 80,
+                    "temperature": 0.1
+                },
+                timeout=10
+            )
+            import json as _j
+            raw = classify_res.json()["choices"][0]["message"]["content"].strip()
+            raw = raw.replace("```json","").replace("```","").strip()
+            parsed = _j.loads(raw)
+            intent       = parsed.get("intent", "analyse")
+            short_prompt = parsed.get("edit_prompt", caption) or caption
+
+        # ── step 2a: ANALYSE ─────────────────────────────────────
+        if intent == "analyse":
+            content = [
+                {"type": "text", "text": caption if caption else "Describe this image in detail."},
+                {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}}
+            ]
+            if b64_2:
+                content.append({"type": "image_url", "image_url": {"url": f"data:{mime2};base64,{b64_2}"}})
+
+            res = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+                json={
+                    "model": "meta-llama/llama-4-scout-17b-16e-instruct",
+                    "messages": [{"role": "user", "content": content}],
+                    "max_tokens": 500
+                },
+                timeout=30
+            )
+            reply = res.json()["choices"][0]["message"]["content"].strip()
+
+        # ── step 2b: EDIT via NVIDIA qwen-image-edit ─────────────
+        else:
+            if not nvapi_key:
+                return jsonify({"reply": "Image editing is not configured yet. Ask the admin to set NVIDIA_API_KEY!"})
+
+            # NVIDIA qwen-image-edit uses multipart form
+            files_payload = {"image": (image_file.filename or "image.jpg", img_bytes, mime)}
+            if img_bytes2:
+                files_payload["mask"] = (image_file2.filename or "image2.jpg", img_bytes2, mime2)
+
+            edit_res = requests.post(
+                "https://integrate.api.nvidia.com/v1/images/edits",
+                headers={"Authorization": f"Bearer {nvapi_key}"},
+                files=files_payload,
+                data={
+                    "model": "qwen/qwen-image-edit",
+                    "prompt": short_prompt,
+                    "n": 1,
+                    "size": "1024x1024"
+                },
+                timeout=60
+            )
+            edit_json = edit_res.json()
+
+            # Response contains base64 image
+            if "data" in edit_json and edit_json["data"]:
+                img_b64_result = edit_json["data"][0].get("b64_json", "")
+                if img_b64_result:
+                    img_url = f"data:image/png;base64,{img_b64_result}"
+                    reply = f"__EDITED_IMAGE__{img_url}"
+                else:
+                    url_result = edit_json["data"][0].get("url", "")
+                    reply = f"__EDITED_IMAGE__{url_result}"
+            else:
+                reply = f"Image editing failed: {edit_json.get('error', {}).get('message', 'Unknown error')}"
+
+        # ── save to chat ─────────────────────────────────────────
         sid = session.get("session_id")
-        user_label = f"[Image uploaded] {caption}" if caption else "[Image uploaded]"
+        num_imgs = "2 images" if b64_2 else "image"
+        user_label = f"[{num_imgs} uploaded] {caption}" if caption else f"[{num_imgs} uploaded]"
+
         save_chat(session["user"], "You", user_label, sid)
-        save_chat(session["user"], "Jarvis", reply, sid)
+        save_chat(session["user"], "Jarvis", reply if not reply.startswith("__EDITED_IMAGE__") else "[Edited image generated]", sid)
         session.setdefault("messages", [])
-        session["messages"].append({"sender": "You", "text": user_label})
-        session["messages"].append({"sender": "Jarvis", "text": reply})
+        session["messages"].append({"sender": "You",   "text": user_label})
+        session["messages"].append({"sender": "Jarvis","text": reply})
         session.modified = True
-        return jsonify({"reply": reply})
+
+        return jsonify({"reply": reply, "intent": intent})
 
     except Exception as e:
         return jsonify({"reply": f"Error: {str(e)}"})
+      
 
 
 @app.errorhandler(404)
