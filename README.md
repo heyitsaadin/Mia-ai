@@ -1,4 +1,4 @@
-# 🤖 Jarvis AI
+#  Jarvis AI
 
 A personal AI chatbot web app powered by **Groq LLaMA**, built with Flask and deployed on Vercel. Jarvis has a warm, conversational personality, supports image generation and analysis, real-time math, and a full user authentication system with a PostgreSQL backend.
 
@@ -6,7 +6,7 @@ A personal AI chatbot web app powered by **Groq LLaMA**, built with Flask and de
 
 ---
 
-## ✨ Features
+##  Features
 
 - **AI Chat** — Powered by Groq's LLaMA 3.1 model. Jarvis replies conversationally, matches user energy, uses emojis naturally, and keeps responses short unless detail is asked for.
 - **Image Generation** — Generate images from text prompts via Pollinations.ai (no API key needed). Supports download of generated images.
@@ -24,7 +24,7 @@ A personal AI chatbot web app powered by **Groq LLaMA**, built with Flask and de
 
 ---
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 | Layer | Technology |
 |---|---|
@@ -40,7 +40,7 @@ A personal AI chatbot web app powered by **Groq LLaMA**, built with Flask and de
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 Jarvis-Ai/
@@ -59,7 +59,7 @@ Jarvis-Ai/
 
 ---
 
-## 🔑 Environment Variables
+## Environment Variables
 
 Never commit secrets. Set these in your Vercel project settings (or a local `.env` file):
 
@@ -76,7 +76,7 @@ Never commit secrets. Set these in your Vercel project settings (or a local `.en
 
 ---
 
-## 🚀 Running Locally
+##  Running Locally
 
 ```bash
 # 1. Clone the repo
@@ -102,7 +102,7 @@ Then open [http://localhost:5000](http://localhost:5000)
 
 ---
 
-## 🗄️ Database
+##  Database
 
 Uses **Neon PostgreSQL**. Tables are auto-created on first run via `init_db()`:
 
@@ -113,7 +113,7 @@ Uses **Neon PostgreSQL**. Tables are auto-created on first run via `init_db()`:
 
 ---
 
-## 🔒 Security Notes
+##  Security Notes
 
 - Passwords are hashed using Werkzeug's `generate_password_hash`
 - Flask secret key is randomly generated if not set via env
@@ -124,6 +124,6 @@ Uses **Neon PostgreSQL**. Tables are auto-created on first run via `init_db()`:
 
 ---
 
-## 👤 Built By
+## Built By
 
 **Aadin KC** — [Portfolio](https://aadinkc-portfolio.vercel.app/) · [GitHub](https://github.com/heyitsaadin) · [LinkedIn](https://www.linkedin.com/in/aadin-kc-128bb3371)
