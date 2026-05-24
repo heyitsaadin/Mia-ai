@@ -6,3 +6,4 @@ gunicorn
 pdfplumber
 google-generativeai
 Pillow
+flask-limiter
