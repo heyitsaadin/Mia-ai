@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, session, jsonify
+from flask import Flask, render_template, request, redirect, session, jsonify, send_from_directory
 import os
 import secrets
 import requests
@@ -1723,6 +1723,18 @@ def server_error(e):
 @app.route("/test500")
 def test500():
     raise Exception("test")
+
+@app.route('/static/sw.js')
+def service_worker():
+    response = send_from_directory('static', 'sw.js')
+    response.headers['Service-Worker-Allowed'] = '/'
+    response.headers['Cache-Control'] = 'no-cache'
+    return response
+
+
+
+
+
 
 
 # ══════════════════════════════════════════════════════════════════
