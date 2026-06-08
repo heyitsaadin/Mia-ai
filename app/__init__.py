@@ -23,12 +23,8 @@ def create_app():
     #     storage_uri="memory://"
     # )
     
-    # Initialize Database
-    try:
-        init_db_pool()
-        init_db()
-    except Exception as e:
-        print(f"Database initialization failed: {e}")
+    # Database will be initialized lazily when needed
+    pass
     
     # Register Blueprints
     from app.routes.main import main_bp
