@@ -4,6 +4,7 @@ import secrets
 from datetime import timedelta
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from app.models import init_db_pool, init_db
 
 def create_app():
     app = Flask(__name__)
@@ -22,7 +23,20 @@ def create_app():
         storage_uri="memory://"
     )
     
-    # Import and register blueprints/routes
-    # (To be implemented as routes are moved)
+    # Initialize Database
+    with app.app_context():
+        init_db_pool()
+        init_db()
+    
+    # Register Blueprints
+    from app.routes.main import main_bp
+    from app.routes.auth import auth_bp
+    from app.routes.chat import chat_bp
+    from app.routes.admin import admin_bp
+    
+    app.register_blueprint(main_bp)
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(chat_bp)
+    app.register_blueprint(admin_bp)
     
     return app
