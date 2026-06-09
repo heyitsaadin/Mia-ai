@@ -101,7 +101,9 @@
        HAMBURGER — top right
     ══════════════════════════════════ */
     .ham-wrap {
-      position:fixed; top:16px; right:16px; z-index:155;
+      position:fixed; 
+      top: calc(16px + env(safe-area-inset-top, 0px));
+      right:16px; z-index:155;
       opacity:0; animation:fadeIn 0.5s 0.6s ease forwards;
       transition: opacity 0.2s, pointer-events 0s;
     }
@@ -158,6 +160,7 @@
       flex-shrink:0;
       display:flex; justify-content:flex-end;
       padding:16px 20px 12px;
+      padding-top: calc(16px + env(safe-area-inset-top, 0px));
     }
     .menu-close {
       width:36px; height:36px; border-radius:50%; cursor:pointer;

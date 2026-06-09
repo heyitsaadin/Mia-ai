@@ -60,7 +60,9 @@
         .header-nav {
             position: fixed; top: 0; left: 0; right: 0;
             display: flex; align-items: center;
-            padding: 18px 24px; z-index: 10;
+            padding: 18px 24px; 
+            padding-top: calc(18px + env(safe-area-inset-top, 0px));
+            z-index: 10;
         }
         .brand-title {
             font-family: 'Barlow Condensed', sans-serif;
