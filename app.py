@@ -754,21 +754,35 @@ def _img_html(src, prompt):
 
 def _try_huggingface(prompt):
     import base64 as _b64
-    HF_API_KEY = os.environ.get("HF_API_KEY", "")
-    if not HF_API_KEY:
+    # Try multiple HF API keys in sequence
+    hf_keys = [
+        os.environ.get("HF_API_KEY", ""),
+        os.environ.get("HF_API_KEY_2", ""),
+        os.environ.get("HF_API_KEY_3", ""),
+        os.environ.get("HF_API_KEY_4", ""),
+    ]
+    hf_keys = [k for k in hf_keys if k]  # Filter out empty keys
+    
+    if not hf_keys:
         return None
-    try:
-        resp = requests.post(
-            "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell",
-            headers={"Authorization": f"Bearer {HF_API_KEY}"},
-            json={"inputs": prompt},
-            timeout=60
-        )
-        if resp.status_code == 200 and resp.content:
-            b64 = _b64.b64encode(resp.content).decode("utf-8")
-            return _img_html(f"data:image/jpeg;base64,{b64}", prompt)
-    except Exception as e:
-        print(f"[IMG][HF] exception: {e}")
+    
+    for idx, key in enumerate(hf_keys):
+        try:
+            resp = requests.post(
+                "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell",
+                headers={"Authorization": f"Bearer {key}"},
+                json={"inputs": prompt},
+                timeout=60
+            )
+            if resp.status_code == 200 and resp.content:
+                b64 = _b64.b64encode(resp.content).decode("utf-8")
+                return _img_html(f"data:image/jpeg;base64,{b64}", prompt)
+            elif resp.status_code != 200:
+                error_detail = resp.text[:100] if resp.text else f"HTTP {resp.status_code}"
+                print(f"[IMG][HF] key #{idx+1} returned {resp.status_code}: {error_detail}")
+        except Exception as e:
+            error_msg = str(e)[:150]
+            print(f"[IMG][HF] key #{idx+1} exception: {error_msg}")
     return None
 
 def _try_together(prompt):
@@ -851,11 +865,15 @@ def _try_stable_horde(prompt):
     return None
 
 def generate_image(prompt):
-    # 1. HuggingFace FLUX.1-schnell (primary)
+    # 1. HuggingFace FLUX.1-schnell (primary) - tries multiple API keys
     html = _try_huggingface(prompt)
     if html:
         return html
-    # 2. Stable Horde (backup if HF fails)
+    # 2. Together AI (backup if HF fails)
+    html = _try_together(prompt)
+    if html:
+        return html
+    # 3. Stable Horde (final backup)
     html = _try_stable_horde(prompt)
     if html:
         return html
