@@ -72,6 +72,18 @@
 
         button, textarea { outline: none; border: none; background: none; }
 
+        /* ─ Smooth theme transition ─ */
+        body.theme-transitioning,
+        body.theme-transitioning *,
+        body.theme-transitioning *::before,
+        body.theme-transitioning *::after {
+            transition:
+                background-color 0.4s ease,
+                color 0.4s ease,
+                border-color 0.4s ease,
+                box-shadow 0.4s ease !important;
+        }
+
         body {
             background-color: var(--bg-primary);
             color: var(--text-primary);
@@ -80,15 +92,15 @@
             justify-content: center;
             overflow: hidden;
             position: relative;
-            transition: background-color 0.25s;
+            transition: background-color 0.4s ease, color 0.4s ease;
         }
 
-        /* When empty state is showing, body goes dark to let gradient shine */
-        body:not(.has-messages) {
-            background-color: #050812 !important;
+        /* Empty-state mode: dark bg for gradient to shine */
+        body.jarvis-welcome {
+            background-color: #060a14 !important;
         }
-        [data-theme="light"] body:not(.has-messages) {
-            background-color: #f0f4ff !important;
+        [data-theme="light"] body.jarvis-welcome {
+            background-color: #eef1ff !important;
         }
 
         /* ════════════════════════════════
@@ -902,36 +914,45 @@
         }
         .edit-dropdown-backdrop.open { display: block; }
 
+        /* Message stream */
         .message-stream {
             flex: 1; overflow-y: auto;
-            padding: 72px 4px 160px 4px;
+            padding: 72px 4px 150px 4px;
             padding-top: calc(110px + env(safe-area-inset-top, 0px));
-            padding-bottom: calc(160px + env(safe-area-inset-bottom, 0px));
+            padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px));
             scroll-behavior: smooth;
         }
         .message-stream::-webkit-scrollbar { width: 0; background: transparent; }
 
-        /* ════ DOCK (new design) ════ */
+        /* ════════════════════════════════
+           DOCK (new design)
+        ════════════════════════════════ */
         .dock-wrapper {
             position: fixed; bottom: 0; left: 0; right: 0;
-            padding: 16px 16px calc(20px + env(safe-area-inset-bottom, 0px));
-            background: linear-gradient(to top, rgba(5,8,18,0.97) 55%, rgba(5,8,18,0) 100%);
+            padding: 16px 16px calc(22px + env(safe-area-inset-bottom, 0px));
+            /* gradient fades to bg so dock never floats over content jarringly */
+            background: linear-gradient(to top, var(--bg-primary) 65%, transparent);
             display: flex; flex-direction: column; gap: 8px;
             z-index: 30;
-            /* max-width mirrors chat-container */
-            max-width: 720px;
-            margin: 0 auto;
+            max-width: 720px; margin: 0 auto;
+            transition: background 0.4s ease;
         }
-        [data-theme="light"] .dock-wrapper {
-            background: linear-gradient(to top, rgba(240,244,255,0.97) 55%, rgba(240,244,255,0) 100%);
+        /* In welcome mode the bg is dark — match it */
+        body.jarvis-welcome .dock-wrapper {
+            background: linear-gradient(to top, #060a14 65%, transparent);
         }
-        /* On desktop the sidebar shifts things — keep dock aligned to chat col */
+        [data-theme="light"] body.jarvis-welcome .dock-wrapper {
+            background: linear-gradient(to top, #eef1ff 65%, transparent);
+        }
         @media (min-width: 700px) {
-            .dock-wrapper {
-                left: 260px;
-                max-width: none;
-                margin: 0;
-            }
+            .dock-wrapper { left: 260px; max-width: none; margin: 0; }
+        }
+        /* Light mode textarea text must be dark */
+        [data-theme="light"] .input-row textarea {
+            color: #181816;
+        }
+        [data-theme="light"] .input-row textarea::placeholder {
+            color: #9a9893;
         }
 
         /* ── Tray backdrop ── */
@@ -1103,9 +1124,6 @@
             font-family: inherit;
         }
         .input-row textarea::placeholder { color: var(--text-secondary); }
-        /* In empty state, placeholder is white-ish on dark bg */
-        body:not(.has-messages) .input-row textarea { color: #f0f0f0; }
-        body:not(.has-messages) .input-row textarea::placeholder { color: rgba(255,255,255,0.45); }
 
         /* Send button — solid accent with glow */
         .submit-btn {
@@ -1125,22 +1143,17 @@
         .dock-footer { text-align: center; font-size: 9px; color: var(--text-secondary); letter-spacing: 1.5px; padding-top: 2px; }
         .dock-footer span { color: var(--text-primary); font-weight: 700; }
 
-        /* ════ VIBRANT ANIMATED GRADIENT BACKGROUND ════ */
-        @keyframes gradientShift {
-            0%   { background-position: 0% 50%; }
-            25%  { background-position: 100% 0%; }
-            50%  { background-position: 100% 100%; }
-            75%  { background-position: 0% 100%; }
-            100% { background-position: 0% 50%; }
-        }
+        /* ════════════════════════════════
+           AURORA GRADIENT BACKGROUND
+        ════════════════════════════════ */
         @keyframes auroraFloat {
             0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.7; }
             33%       { transform: translate(30px, -20px) scale(1.08); opacity: 1; }
-            66%       { transform: translate(-20px, 15px) scale(0.95); opacity: 0.6; }
+            66%       { transform: translate(-20px, 15px) scale(0.95); opacity: 0.55; }
         }
         @keyframes auroraFloat2 {
             0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.5; }
-            33%       { transform: translate(-40px, 25px) scale(1.1); opacity: 0.9; }
+            33%       { transform: translate(-40px, 25px) scale(1.1); opacity: 0.85; }
             66%       { transform: translate(25px, -30px) scale(0.92); opacity: 0.4; }
         }
         @keyframes auroraFloat3 {
@@ -1148,153 +1161,128 @@
             50%       { transform: translate(20px, 30px) scale(1.05); opacity: 1; }
         }
 
-        .bottom-glow {
-            position: fixed;
-            inset: 0;
+        .jarvis-bg {
+            position: fixed; inset: 0;
+            z-index: 2; overflow: hidden;
             pointer-events: none;
-            z-index: 5;
-            overflow: hidden;
-            background: #050812;
-            transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0; /* hidden by default */
+            transition: opacity 0.6s ease;
         }
-        .bottom-glow::before,
-        .bottom-glow::after,
-        .bottom-glow .aurora1,
-        .bottom-glow .aurora2,
-        .bottom-glow .aurora3 {
-            content: '';
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(70px);
-            mix-blend-mode: screen;
+        body.jarvis-welcome .jarvis-bg { opacity: 1; }
+        .jarvis-bg .ab {
+            position: absolute; border-radius: 50%;
+            filter: blur(72px); mix-blend-mode: screen;
         }
-        .bottom-glow::before {
-            width: 60vw; height: 60vw;
-            background: radial-gradient(circle, rgba(99,27,255,0.75) 0%, rgba(67,6,196,0.4) 50%, transparent 70%);
-            bottom: -10%; left: -10%;
+        .jarvis-bg .ab1 {
+            width: 65vw; height: 65vw;
+            background: radial-gradient(circle, rgba(88,20,255,0.8) 0%, rgba(60,5,180,0.35) 55%, transparent 70%);
+            bottom: -12%; left: -12%;
             animation: auroraFloat 8s ease-in-out infinite;
         }
-        .bottom-glow::after {
-            width: 55vw; height: 55vw;
-            background: radial-gradient(circle, rgba(0,162,255,0.65) 0%, rgba(0,80,200,0.3) 50%, transparent 70%);
-            bottom: -5%; right: -15%;
+        .jarvis-bg .ab2 {
+            width: 60vw; height: 60vw;
+            background: radial-gradient(circle, rgba(0,150,255,0.7) 0%, rgba(0,70,200,0.3) 55%, transparent 70%);
+            bottom: -5%; right: -18%;
             animation: auroraFloat2 10s ease-in-out infinite;
         }
-        .aurora1, .aurora2, .aurora3 { position: absolute; border-radius: 50%; filter: blur(70px); mix-blend-mode: screen; }
-        .aurora1 {
-            width: 45vw; height: 45vw;
-            background: radial-gradient(circle, rgba(255,0,200,0.55) 0%, rgba(180,0,120,0.25) 50%, transparent 70%);
-            bottom: 20%; left: 30%;
+        .jarvis-bg .ab3 {
+            width: 50vw; height: 50vw;
+            background: radial-gradient(circle, rgba(240,0,190,0.55) 0%, rgba(160,0,110,0.2) 55%, transparent 70%);
+            bottom: 22%; left: 28%;
             animation: auroraFloat3 7s ease-in-out infinite;
         }
-        .aurora2 {
+        .jarvis-bg .ab4 {
             width: 40vw; height: 40vw;
-            background: radial-gradient(circle, rgba(0,255,180,0.4) 0%, rgba(0,160,100,0.15) 50%, transparent 70%);
-            top: 10%; right: 10%;
+            background: radial-gradient(circle, rgba(0,240,160,0.38) 0%, transparent 70%);
+            top: 8%; right: 8%;
             animation: auroraFloat 12s ease-in-out infinite reverse;
         }
-        .aurora3 {
+        .jarvis-bg .ab5 {
             width: 35vw; height: 35vw;
-            background: radial-gradient(circle, rgba(255,160,0,0.35) 0%, rgba(200,80,0,0.12) 50%, transparent 70%);
-            top: 30%; left: 5%;
+            background: radial-gradient(circle, rgba(255,150,0,0.32) 0%, transparent 70%);
+            top: 28%; left: 4%;
             animation: auroraFloat2 9s ease-in-out infinite reverse;
         }
+        [data-theme="light"] .jarvis-bg .ab1 {
+            background: radial-gradient(circle, rgba(120,60,255,0.42) 0%, transparent 70%);
+        }
+        [data-theme="light"] .jarvis-bg .ab2 {
+            background: radial-gradient(circle, rgba(0,100,255,0.35) 0%, transparent 70%);
+        }
+        [data-theme="light"] .jarvis-bg .ab3 { opacity: 0.5; }
+        [data-theme="light"] .jarvis-bg .ab4 { opacity: 0.3; }
+        [data-theme="light"] .jarvis-bg .ab5 { opacity: 0.2; }
 
-        /* Dark overlay so text remains readable when chat has messages */
-        .bottom-glow.faded {
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        /* When there ARE messages, hide the full-screen gradient and just show subtle bottom fade */
-        body.has-messages .bottom-glow {
-            opacity: 0 !important;
-        }
-
-        [data-theme="light"] .bottom-glow {
-            background: #f0f4ff;
-        }
-        [data-theme="light"] .bottom-glow::before {
-            background: radial-gradient(circle, rgba(120,60,255,0.4) 0%, transparent 70%);
-        }
-        [data-theme="light"] .bottom-glow::after {
-            background: radial-gradient(circle, rgba(0,120,255,0.35) 0%, transparent 70%);
-        }
-
-        /* ════ EMPTY / WELCOME STATE ════ */
-        @keyframes greetFadeUp {
-            from { opacity: 0; transform: translateY(18px) scale(0.97); }
-            to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        @keyframes greetGlow {
-            0%, 100% { text-shadow: 0 0 40px rgba(120,60,255,0.5), 0 0 80px rgba(0,162,255,0.25); }
-            50%       { text-shadow: 0 0 60px rgba(180,0,255,0.7), 0 0 120px rgba(0,162,255,0.4), 0 2px 0 rgba(255,255,255,0.1); }
-        }
+        /* ════════════════════════════════
+           WELCOME GREETING
+        ════════════════════════════════ */
         @keyframes cursorBlink {
             0%, 100% { opacity: 1; }
             50%       { opacity: 0; }
         }
+        @keyframes greetGlow {
+            0%, 100% { text-shadow: 0 0 40px rgba(110,50,255,0.55), 0 0 90px rgba(0,150,255,0.22); }
+            50%       { text-shadow: 0 0 65px rgba(180,0,255,0.75), 0 0 130px rgba(0,150,255,0.38); }
+        }
+        @keyframes subFadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
 
-        .chat-empty-state {
-            position: fixed;
-            /* sit in upper-centre, well above the dock */
-            top: 0; left: 0; right: 0; bottom: 0;
+        .jarvis-greeting {
+            position: fixed; inset: 0;
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
+            padding: 0 32px 140px; /* bottom padding clears dock */
+            z-index: 10;
             pointer-events: none;
-            z-index: 8;
-            padding: 0 32px;
-            /* nudge upward so gradient colours show below */
-            padding-bottom: 140px;
-            opacity: 1;
-            transition: opacity 0.4s ease;
-        }
-        .chat-empty-state.hidden {
             opacity: 0;
+            transform: scale(0.97);
+            transition: opacity 0.5s cubic-bezier(0.16,1,0.3,1),
+                        transform 0.5s cubic-bezier(0.16,1,0.3,1);
         }
-        .chat-empty-state h2 {
-            font-size: clamp(26px, 7vw, 38px);
+        body.jarvis-welcome .jarvis-greeting {
+            opacity: 1; transform: scale(1);
+        }
+        .jarvis-greeting h2 {
+            font-size: clamp(24px, 7vw, 36px);
             font-weight: 600;
-            letter-spacing: -0.5px;
-            color: #fff;
+            letter-spacing: -0.4px;
+            color: #ffffff;
             text-align: center;
             line-height: 1.3;
             margin: 0;
-            /* typewriter revealed via JS — start invisible */
-            min-height: 1.3em;
-            animation: greetGlow 4s ease-in-out infinite 1s;
+            min-height: 1.35em;
+            animation: greetGlow 4s ease-in-out infinite 1.2s;
         }
-        /* Typewriter cursor appended via JS */
-        .tw-cursor {
-            display: inline-block;
-            width: 2px; height: 1em;
-            background: rgba(255,255,255,0.85);
-            margin-left: 3px;
-            vertical-align: middle;
-            border-radius: 1px;
-            animation: cursorBlink 0.75s step-end infinite;
-        }
-        [data-theme="light"] .chat-empty-state h2 {
-            color: #1a0a4a;
+        [data-theme="light"] .jarvis-greeting h2 {
+            color: #1a0a48;
             animation: none;
             text-shadow: none;
         }
-        .chat-empty-state .greet-sub {
-            font-size: 14px;
-            font-weight: 400;
+        .tw-cursor {
+            display: inline-block;
+            width: 2.5px; height: 0.85em;
+            background: currentColor;
+            margin-left: 2px;
+            vertical-align: middle;
+            border-radius: 1px;
+            opacity: 0.85;
+            animation: cursorBlink 0.72s step-end infinite;
+        }
+        .jarvis-greeting .greet-sub {
+            font-size: 14px; font-weight: 400;
             color: rgba(255,255,255,0.42);
             margin-top: 10px;
-            letter-spacing: 0.2px;
             text-align: center;
             opacity: 0;
-            transition: opacity 0.6s ease;
+            pointer-events: none;
         }
-        .chat-empty-state .greet-sub.visible {
+        .jarvis-greeting .greet-sub.visible {
+            animation: subFadeIn 0.55s cubic-bezier(0.16,1,0.3,1) both;
             opacity: 1;
         }
-        [data-theme="light"] .chat-empty-state .greet-sub {
-            color: rgba(60,30,120,0.5);
-        }
+        [data-theme="light"] .jarvis-greeting .greet-sub { color: rgba(40,20,100,0.45); }
 
         /* ════════════════════════════════
            ADMIN NOTIFICATION (old)
@@ -1885,17 +1873,19 @@
             </button>
     </div>
 
-    <!-- Vibrant animated gradient background (body-level, position:fixed) -->
-    <div class="bottom-glow" id="bottomGlow">
-        <div class="aurora1"></div>
-        <div class="aurora2"></div>
-        <div class="aurora3"></div>
+    <!-- Aurora gradient background -->
+    <div class="jarvis-bg" id="jarvisBg">
+        <div class="ab ab1"></div>
+        <div class="ab ab2"></div>
+        <div class="ab ab3"></div>
+        <div class="ab ab4"></div>
+        <div class="ab ab5"></div>
     </div>
 
-    <!-- Empty / welcome state (body-level, position:fixed) -->
-    <div class="chat-empty-state" id="chatEmptyState">
-        <h2 id="emptyStateText">Ask away!</h2>
-        <p class="greet-sub" id="emptyStateSub">Your personal AI, ready for anything.</p>
+    <!-- Welcome greeting -->
+    <div class="jarvis-greeting" id="jarvisGreeting">
+        <h2 id="greetText"></h2>
+        <p class="greet-sub" id="greetSub"></p>
     </div>
 
     <div class="dock-wrapper">
@@ -2304,92 +2294,96 @@
     stream.appendChild(typingEl);
     requestAnimationFrame(() => { stream.scrollTop = stream.scrollHeight; });
 
-    // ── Empty state + bottom gradient logic ──
-    const emptyState   = document.getElementById('chatEmptyState');
-    const bottomGlow   = document.getElementById('bottomGlow');
-    const emptyText    = document.getElementById('emptyStateText');
-    const emptySubEl   = document.getElementById('emptyStateSub');
+    // ══════════════════════════════════════════
+    //  WELCOME STATE — greeting + aurora logic
+    // ══════════════════════════════════════════
+    const greetText = document.getElementById('greetText');
+    const greetSub  = document.getElementById('greetSub');
 
-    // Personalise the empty state greeting with random animated greetings + typewriter
-    (function() {
-        // _jarvusUsername is injected by Jinja — always correct, no DOM timing issue
-        const name = (_jarvusUsername && _jarvusUsername.trim()) ? _jarvusUsername.trim() : null;
-        const n = name ? (name.charAt(0).toUpperCase() + name.slice(1)) : 'there';
+    const GREETINGS = [
+        { main: n => `Good to see you, ${n}`,           sub: `Brain's warmed up — what do you need?` },
+        { main: n => `Hey ${n}! Ready when you are`,    sub: `Ask me anything, I've got you.` },
+        { main: n => `What's on your mind, ${n}?`,      sub: `Let's figure it out together.` },
+        { main: n => `Welcome back, ${n}`,              sub: `What shall we tackle today?` },
+        { main: n => `Hi ${n}! Let's do something great`, sub: `No question too big or small.` },
+        { main: n => `${n}, what can I help with?`,     sub: `I'm all ears and fully loaded.` },
+        { main: n => `Morning, ${n}!`,                  sub: `Coffee optional, answers guaranteed.` },
+        { main: n => `Hello ${n} ✦`,                    sub: `Your personal AI, online and ready.` },
+    ];
 
-        const greetings = [
-            { main: `Good to see you, ${n}`,           sub: `Brain's warmed up — what do you need?` },
-            { main: `Hey ${n}! Ready when you are`,    sub: `Ask me anything, I've got you.` },
-            { main: `What's on your mind, ${n}?`,      sub: `Let's figure it out together.` },
-            { main: `Welcome back, ${n}`,              sub: `What shall we tackle today?` },
-            { main: `Hi ${n}! Let's do something great`, sub: `No question too big or small.` },
-            { main: `${n}, what can I help with?`,     sub: `I'm all ears and fully loaded.` },
-            { main: `Morning, ${n}!`,                  sub: `Coffee optional, answers guaranteed.` },
-            { main: `Hello ${n} ✦`,                    sub: `Your personal AI, online and ready.` },
-        ];
+    function getDisplayName() {
+        const raw = _jarvusUsername ? _jarvusUsername.trim() : '';
+        if (!raw || raw === 'you') return 'there';
+        return raw.charAt(0).toUpperCase() + raw.slice(1);
+    }
 
+    function hasRealMessages() {
+        return messages.some(m => m.sender === 'You');
+    }
+
+    function showWelcome() {
+        if (hasRealMessages()) { hideWelcome(false); return; }
+        document.body.classList.add('jarvis-welcome');
+
+        const name = getDisplayName();
         const lastIdx = parseInt(sessionStorage.getItem('j_last_greet') || '-1');
         let idx;
-        do { idx = Math.floor(Math.random() * greetings.length); } while (idx === lastIdx && greetings.length > 1);
-        sessionStorage.setItem('j_last_greet', idx);
+        do { idx = Math.floor(Math.random() * GREETINGS.length); } while (idx === lastIdx && GREETINGS.length > 1);
+        sessionStorage.setItem('j_last_greet', String(idx));
 
-        const g = greetings[idx];
-        if (emptySubEl) { emptySubEl.textContent = g.sub; }
+        const g = GREETINGS[idx];
+        const fullText = g.main(name);
+        greetSub.textContent = g.sub;
+        greetSub.classList.remove('visible');
+        greetText.textContent = '';
 
-        // Typewriter effect
-        emptyText.textContent = '';
+        // Add blinking cursor
         const cursor = document.createElement('span');
         cursor.className = 'tw-cursor';
-        emptyText.appendChild(cursor);
+        greetText.appendChild(cursor);
 
-        const text = g.main;
         let i = 0;
-        const speed = 42; // ms per character
-
-        // Small initial delay so page settles
+        const SPEED = 44;
         setTimeout(function typeChar() {
-            if (i < text.length) {
-                // Insert char before cursor
-                emptyText.insertBefore(document.createTextNode(text[i]), cursor);
+            if (i < fullText.length) {
+                greetText.insertBefore(document.createTextNode(fullText[i]), cursor);
                 i++;
-                setTimeout(typeChar, speed);
+                setTimeout(typeChar, SPEED);
             } else {
-                // Done typing — remove cursor after a beat, fade in subtitle
-                setTimeout(() => { cursor.remove(); }, 800);
-                if (emptySubEl) emptySubEl.classList.add('visible');
+                // Typing done — blink cursor briefly then remove, show subtitle
+                setTimeout(() => {
+                    cursor.remove();
+                    greetSub.classList.add('visible');
+                }, 700);
             }
-        }, 280);
-    })();
-
-    function syncEmptyState() {
-        // Count real messages (skip the greeting from Jarvis if it's the only one)
-        const realMsgs = messages.filter(m => m.sender === 'You');
-        const isEmpty = realMsgs.length === 0;
-        if (isEmpty) {
-            emptyState.classList.remove('hidden');
-            document.body.classList.remove('has-messages');
-        } else {
-            emptyState.classList.add('hidden');
-            document.body.classList.add('has-messages');
-        }
+        }, 320);
     }
-    syncEmptyState();
+
+    function hideWelcome(animate) {
+        if (animate === false) {
+            document.body.classList.remove('jarvis-welcome');
+            return;
+        }
+        // Fade out greeting, then remove class so bg transitions away
+        const greeting = document.getElementById('jarvisGreeting');
+        greeting.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+        greeting.style.opacity = '0';
+        greeting.style.transform = 'scale(0.96) translateY(-8px)';
+        setTimeout(() => {
+            document.body.classList.remove('jarvis-welcome');
+            greeting.style.transition = '';
+            greeting.style.opacity = '';
+            greeting.style.transform = '';
+        }, 420);
+    }
+
+    // Initial render
+    showWelcome();
 
     // ── AJAX send ──
     const chatInput = document.getElementById('chatInput');
     const inputDock = document.getElementById('inputDock');
     const submitBtn = document.getElementById('submitBtn');
-
-    // Subtle dim on focus (don't fully hide when empty)
-    chatInput.addEventListener('focus', function() {
-        const realMsgs = messages.filter(m => m.sender === 'You');
-        if (realMsgs.length > 0) bottomGlow.classList.add('faded');
-    });
-    chatInput.addEventListener('blur', function() {
-        const realMsgs = messages.filter(m => m.sender === 'You');
-        if (realMsgs.length === 0) {
-            bottomGlow.classList.remove('faded');
-        }
-    });
 
     chatInput.addEventListener('input', function() {
         this.style.height = '38px';
@@ -2468,10 +2462,8 @@
         inputDock.classList.remove('has-content');
         submitBtn.disabled = true;
         JarvisSound.send();
-
-        // Hide empty state + keep gradient gone once user sends first message
-        emptyState.classList.add('hidden');
-        bottomGlow.classList.add('faded');
+        // Transition away from welcome state on first message
+        if (document.body.classList.contains('jarvis-welcome')) hideWelcome(true);
 
         // Detect image generation request — show skeleton instead of typing dots
         const _imgKeywords = ['generate', 'draw', 'create', 'make', 'show', 'paint', 'sketch', 'render', 'image', 'picture', 'photo', 'art', 'illustration', 'anime', 'portrait', 'wallpaper'];
@@ -3058,9 +3050,13 @@
     // ── Dark mode ──
     function toggleDarkMode() {
         const isDark = document.body.getAttribute('data-theme') === 'dark';
+        // Add transition class, swap theme, remove class after transition ends
+        document.body.classList.add('theme-transitioning');
         document.body.setAttribute('data-theme', isDark ? 'light' : 'dark');
+        document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
         document.getElementById('darkToggle').classList.toggle('on', !isDark);
         localStorage.setItem('jarvis-dark', isDark ? '' : '1');
+        setTimeout(() => document.body.classList.remove('theme-transitioning'), 420);
     }
     if (localStorage.getItem('jarvis-dark')) {
         document.body.setAttribute('data-theme', 'dark');
