@@ -1101,6 +1101,63 @@
         .dock-footer { text-align: center; font-size: 9px; color: var(--text-secondary); letter-spacing: 1.5px; padding-top: 2px; }
         .dock-footer span { color: var(--text-primary); font-weight: 700; }
 
+        /* ════ GEMINI-STYLE BOTTOM GRADIENT ════ */
+        .bottom-glow {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            height: 260px;
+            pointer-events: none;
+            z-index: 5;
+            background: linear-gradient(to top,
+                rgba(15, 20, 40, 0.92) 0%,
+                rgba(10, 15, 35, 0.65) 40%,
+                transparent 100%
+            );
+            opacity: 1;
+            transition: opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        [data-theme="light"] .bottom-glow {
+            background: linear-gradient(to top,
+                rgba(245, 245, 250, 0.95) 0%,
+                rgba(245, 245, 250, 0.6) 40%,
+                transparent 100%
+            );
+        }
+        .bottom-glow.faded { opacity: 0; }
+
+        /* ════ EMPTY / WELCOME STATE ════ */
+        .chat-empty-state {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -60%);
+            display: flex; flex-direction: column;
+            align-items: center; gap: 18px;
+            pointer-events: none;
+            transition: opacity 0.35s ease, transform 0.35s ease;
+            z-index: 4;
+        }
+        .chat-empty-state.hidden {
+            opacity: 0;
+            transform: translate(-50%, -68%);
+            pointer-events: none;
+        }
+        .jarvis-spark {
+            width: 44px; height: 44px;
+            animation: sparkFloat 3s ease-in-out infinite;
+        }
+        @keyframes sparkFloat {
+            0%, 100% { transform: translateY(0px) scale(1); }
+            50% { transform: translateY(-6px) scale(1.06); }
+        }
+        .chat-empty-state h2 {
+            font-size: 26px;
+            font-weight: 300;
+            letter-spacing: -0.3px;
+            color: var(--text-primary);
+            text-align: center;
+            line-height: 1.2;
+        }
+
         /* ════════════════════════════════
            ADMIN NOTIFICATION (old)
         ════════════════════════════════ */
@@ -1697,6 +1754,27 @@
             <button class="img-preview-remove" id="imgRemove" title="Remove">✕</button>
         </div>
 
+        <!-- Gemini-style bottom gradient glow -->
+        <div class="bottom-glow" id="bottomGlow"></div>
+
+        <!-- Empty / welcome state (Gemini style) -->
+        <div class="chat-empty-state" id="chatEmptyState">
+            <svg class="jarvis-spark" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="sparkGrad" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#a78bfa"/>
+                        <stop offset="35%" stop-color="#60a5fa"/>
+                        <stop offset="65%" stop-color="#34d399"/>
+                        <stop offset="100%" stop-color="#fbbf24"/>
+                    </linearGradient>
+                </defs>
+                <!-- 4-pointed star shape like Gemini -->
+                <path d="M22 2 C22 2 23.5 14 30 22 C23.5 30 22 42 22 42 C22 42 20.5 30 14 22 C20.5 14 22 2 22 2Z" fill="url(#sparkGrad)"/>
+                <path d="M2 22 C2 22 14 23.5 22 30 C30 23.5 42 22 42 22 C42 22 30 20.5 22 14 C14 20.5 2 22 2 22Z" fill="url(#sparkGrad)" opacity="0.85"/>
+            </svg>
+            <h2 id="emptyStateText">Ask away!</h2>
+        </div>
+
         <!-- Input dock -->
         <div class="input-dock" id="inputDock">
             <div class="input-row">
@@ -2096,10 +2174,47 @@
     stream.appendChild(typingEl);
     requestAnimationFrame(() => { stream.scrollTop = stream.scrollHeight; });
 
+    // ── Empty state + bottom gradient logic ──
+    const emptyState   = document.getElementById('chatEmptyState');
+    const bottomGlow   = document.getElementById('bottomGlow');
+    const emptyText    = document.getElementById('emptyStateText');
+
+    // Personalise the empty state greeting with the username from messages
+    (function() {
+        const uname = (messages[0] && messages[0].sender !== 'You') ? null : null;
+        // Pull username from page if available
+        const drawerName = document.querySelector('.drawer-uname');
+        if (drawerName) emptyText.textContent = 'Ask away, ' + drawerName.textContent.trim() + '!';
+        else emptyText.textContent = 'Ask away!';
+    })();
+
+    function syncEmptyState() {
+        // Count real messages (skip the greeting from Jarvis if it's the only one)
+        const realMsgs = messages.filter(m => m.sender === 'You');
+        const isEmpty = realMsgs.length === 0;
+        if (isEmpty) {
+            emptyState.classList.remove('hidden');
+        } else {
+            emptyState.classList.add('hidden');
+        }
+    }
+    syncEmptyState();
+
     // ── AJAX send ──
     const chatInput = document.getElementById('chatInput');
     const inputDock = document.getElementById('inputDock');
     const submitBtn = document.getElementById('submitBtn');
+
+    // Fade gradient on focus, restore on blur (if still empty)
+    chatInput.addEventListener('focus', function() {
+        bottomGlow.classList.add('faded');
+    });
+    chatInput.addEventListener('blur', function() {
+        const realMsgs = messages.filter(m => m.sender === 'You');
+        if (realMsgs.length === 0) {
+            bottomGlow.classList.remove('faded');
+        }
+    });
 
     chatInput.addEventListener('input', function() {
         this.style.height = '38px';
@@ -2178,6 +2293,10 @@
         inputDock.classList.remove('has-content');
         submitBtn.disabled = true;
         JarvisSound.send();
+
+        // Hide empty state + keep gradient gone once user sends first message
+        emptyState.classList.add('hidden');
+        bottomGlow.classList.add('faded');
 
         // Detect image generation request — show skeleton instead of typing dots
         const _imgKeywords = ['generate', 'draw', 'create', 'make', 'show', 'paint', 'sketch', 'render', 'image', 'picture', 'photo', 'art', 'illustration', 'anime', 'portrait', 'wallpaper'];

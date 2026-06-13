@@ -212,15 +212,31 @@ def return_db(conn):
 
 def get_greeting(username):
     hour = datetime.now(IST).hour
-    period = "morning" if hour < 12 else "afternoon" if hour < 17 else "evening"
-    greetings = [
-        f"Good {period}, {username}! 😊 Hope you're having a great one — what's on your mind?",
-        f"Hey {username}! 👋 Good {period} to you! Ready to help whenever you are.",
-        f"Good {period}, {username}! ✨ Great to see you — what can Jarvis do for you today?",
-        f"Hey hey, {username}! 🌟 Good {period}! I'm all ears — what do you need?",
-        f"Good {period}, {username}! 🤖 Jarvis online and ready. What's up?",
-    ]
-    return greetings[datetime.now(IST).minute % len(greetings)]
+    if hour < 12:
+        time_greets = [
+            f"Morning, {username}! ☀️ What are we tackling today?",
+            f"Rise and shine, {username}! Let's get into it — what's first?",
+            f"Good morning, {username}! Brain's warmed up. What do you need?",
+            f"Hey {username}! Early bird energy. What's on your mind?",
+            f"Morning! I'm already thinking, {username} — give me something good.",
+        ]
+    elif hour < 17:
+        time_greets = [
+            f"Hey {username}! Midday hit different — what are we doing?",
+            f"Afternoon, {username}! Still got tons of energy. What's up?",
+            f"What's good, {username}? Let's make this afternoon count.",
+            f"Hey! {username}, I've been waiting — what do you need?",
+            f"Afternoon, {username}! Drop it on me — I'm ready.",
+        ]
+    else:
+        time_greets = [
+            f"Evening, {username}! Still up? Let's get things done.",
+            f"Hey {username}! Night owl mode activated — what's the move?",
+            f"Good evening, {username}! I don't sleep, so you're covered.",
+            f"Evening! {username}, you and me, let's figure something out.",
+            f"Hey {username}! Late session? I'm fully charged — what do you need?",
+        ]
+    return time_greets[datetime.now(IST).minute % len(time_greets)]
 
 def init_db():
     conn = get_db()
