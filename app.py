@@ -30,7 +30,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "jarvis_ai_stable_secret_key_8a5c2
 app.config["SESSION_PERMANENT"] = True
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=90)
 app.config["MAX_COOKIE_SIZE"] = 4093
-app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SAMESITE"] = "None"
 app.config["SESSION_COOKIE_SECURE"] = True
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 # ── Environment validation ──
@@ -236,6 +236,14 @@ def init_db():
         )
     """)
     cur.execute("""
+        CREATE TABLE IF NOT EXISTS auth_tokens (
+            token       TEXT PRIMARY KEY,
+            username    TEXT,
+            created_at  TEXT,
+            last_used   TEXT
+        )
+    """)
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS chat_sessions (
             id          SERIAL PRIMARY KEY,
             username    TEXT,
@@ -345,6 +353,43 @@ def add_user(username, password):
     conn = get_db()
     cur = conn.cursor()
     cur.execute("INSERT INTO users VALUES (%s, %s)", (username, generate_password_hash(password)))
+    conn.commit()
+    cur.close()
+    return_db(conn)
+
+def create_auth_token(username):
+    token = secrets.token_hex(32)
+    conn = get_db()
+    cur = conn.cursor()
+    now = datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S")
+    cur.execute(
+        "INSERT INTO auth_tokens (token, username, created_at, last_used) VALUES (%s, %s, %s, %s)",
+        (token, username, now, now)
+    )
+    conn.commit()
+    cur.close()
+    return_db(conn)
+    return token
+
+def get_user_by_token(token):
+    if not token:
+        return None
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT username FROM auth_tokens WHERE token=%s", (token,))
+    row = cur.fetchone()
+    if row:
+        now = datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S")
+        cur.execute("UPDATE auth_tokens SET last_used=%s WHERE token=%s", (now, token))
+        conn.commit()
+    cur.close()
+    return_db(conn)
+    return row["username"] if row else None
+
+def delete_auth_token(token):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM auth_tokens WHERE token=%s", (token,))
     conn.commit()
     cur.close()
     return_db(conn)
@@ -635,6 +680,19 @@ def check_ban():
     ip = get_remote_address()
     if is_banned(ip, "ip"):
         return render_template("banned.html", reason="Your IP has been banned."), 403
+
+    # If no active session, try to restore it from the long-lived auth token cookie.
+    if not session.get("user"):
+        token = request.cookies.get("jarvis_auth_token")
+        username = get_user_by_token(token)
+        if username and not is_banned(username, "user"):
+            session.permanent = True
+            session["user"]                = username
+            session["is_owner"]            = False
+            session["awaiting_owner_code"] = False
+            session["chat_key"]            = secrets.token_hex(8)
+            session["messages"] = [{"sender": "Jarvis", "text": get_greeting(username)}]
+
     user = session.get("user")
     if user and is_banned(user, "user"):
         session.clear()
@@ -1566,6 +1624,17 @@ def _parse_groq_json(raw):
 def login():
     log_visit()
     error = ""
+    if request.method == "GET" and not session.get("user"):
+        token = request.cookies.get("jarvis_auth_token")
+        username = get_user_by_token(token)
+        if username and not is_banned(username, "user"):
+            session.permanent = True
+            session["user"]                = username
+            session["is_owner"]            = False
+            session["awaiting_owner_code"] = False
+            session["chat_key"]            = secrets.token_hex(8)
+            session["messages"] = [{"sender": "Jarvis", "text": get_greeting(username)}]
+            return redirect("/landing")
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
@@ -1583,7 +1652,12 @@ def login():
             session["chat_key"]            = secrets.token_hex(8)
             greeting = get_greeting(username)
             session["messages"] = [{"sender": "Jarvis", "text": greeting}]
-            return redirect("/landing")
+            auth_token = create_auth_token(username)
+            resp = redirect("/landing")
+            resp.set_cookie("jarvis_auth_token", auth_token,
+                            max_age=60*60*24*365, secure=True,
+                            httponly=True, samesite="Lax")
+            return resp
         else:
             error = "Incorrect username or password"
     return render_template("login.html", error=error)
@@ -1617,20 +1691,36 @@ def signup():
             session["chat_key"]            = secrets.token_hex(8)
             greeting = get_greeting(username)
             session["messages"] = [{"sender": "Jarvis", "text": greeting}]
-            return redirect("/landing")
+            auth_token = create_auth_token(username)
+            resp = redirect("/landing")
+            resp.set_cookie("jarvis_auth_token", auth_token,
+                            max_age=60*60*24*365, secure=True,
+                            httponly=True, samesite="Lax")
+            return resp
     return render_template("signup.html", error=error, username_taken=username_taken)
 
 @app.route("/logout")
 def logout():
     _flush_chat_session()
+    token = request.cookies.get("jarvis_auth_token")
+    if token:
+        delete_auth_token(token)
     session.clear()
-    return redirect("/")
+    resp = redirect("/")
+    resp.set_cookie("jarvis_auth_token", "", expires=0)
+    return resp
 
 @app.route("/logout_now", methods=["POST"])
 def logout_now():
     _flush_chat_session()
+    token = request.cookies.get("jarvis_auth_token")
+    if token:
+        delete_auth_token(token)
     session.clear()
-    return _json_mod.dumps({"ok": True}), 200, {"Content-Type": "application/json"}
+    resp = _json_mod.dumps({"ok": True}), 200, {"Content-Type": "application/json"}
+    response = app.make_response(resp)
+    response.set_cookie("jarvis_auth_token", "", expires=0)
+    return response
 
 @app.route("/get_chat_key")
 def get_chat_key():
