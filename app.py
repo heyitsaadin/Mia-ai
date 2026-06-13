@@ -30,9 +30,9 @@ app.secret_key = os.environ.get("SECRET_KEY", "jarvis_ai_stable_secret_key_8a5c2
 app.config["SESSION_PERMANENT"] = True
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=90)
 app.config["MAX_COOKIE_SIZE"] = 4093
-app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SAMESITE"] = "None"
 app.config["SESSION_COOKIE_SECURE"] = True
-
+app.config["SESSION_COOKIE_HTTPONLY"] = True
 # ── Environment validation ──
 REQUIRED_ENV_VARS = ["DATABASE_URL", "GROQ_API_KEY", "ADMIN_PASSWORD"]
 MISSING_VARS = [var for var in REQUIRED_ENV_VARS if not os.environ.get(var)]
