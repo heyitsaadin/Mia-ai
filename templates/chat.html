@@ -902,26 +902,36 @@
         }
         .edit-dropdown-backdrop.open { display: block; }
 
-        /* Message stream */
         .message-stream {
             flex: 1; overflow-y: auto;
-            padding: 72px 4px 200px 4px;
+            padding: 72px 4px 160px 4px;
             padding-top: calc(110px + env(safe-area-inset-top, 0px));
+            padding-bottom: calc(160px + env(safe-area-inset-bottom, 0px));
             scroll-behavior: smooth;
         }
         .message-stream::-webkit-scrollbar { width: 0; background: transparent; }
 
-        /* ════════════════════════════════
-           DOCK (new design)
-        ════════════════════════════════ */
+        /* ════ DOCK (new design) ════ */
         .dock-wrapper {
-            position: absolute; bottom: 0; left: 0; right: 0;
-            padding: 16px 16px 20px;
-            background: linear-gradient(to top, rgba(5,8,18,0.96) 60%, rgba(5,8,18,0) 100%);
-            display: flex; flex-direction: column; gap: 8px; z-index: 20;
+            position: fixed; bottom: 0; left: 0; right: 0;
+            padding: 16px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+            background: linear-gradient(to top, rgba(5,8,18,0.97) 55%, rgba(5,8,18,0) 100%);
+            display: flex; flex-direction: column; gap: 8px;
+            z-index: 30;
+            /* max-width mirrors chat-container */
+            max-width: 720px;
+            margin: 0 auto;
         }
         [data-theme="light"] .dock-wrapper {
-            background: linear-gradient(to top, rgba(240,244,255,0.97) 60%, rgba(240,244,255,0) 100%);
+            background: linear-gradient(to top, rgba(240,244,255,0.97) 55%, rgba(240,244,255,0) 100%);
+        }
+        /* On desktop the sidebar shifts things — keep dock aligned to chat col */
+        @media (min-width: 700px) {
+            .dock-wrapper {
+                left: 260px;
+                max-width: none;
+                margin: 0;
+            }
         }
 
         /* ── Tray backdrop ── */
@@ -1875,24 +1885,24 @@
             </button>
     </div>
 
+    <!-- Vibrant animated gradient background (body-level, position:fixed) -->
+    <div class="bottom-glow" id="bottomGlow">
+        <div class="aurora1"></div>
+        <div class="aurora2"></div>
+        <div class="aurora3"></div>
+    </div>
+
+    <!-- Empty / welcome state (body-level, position:fixed) -->
+    <div class="chat-empty-state" id="chatEmptyState">
+        <h2 id="emptyStateText">Ask away!</h2>
+        <p class="greet-sub" id="emptyStateSub">Your personal AI, ready for anything.</p>
+    </div>
+
     <div class="dock-wrapper">
         <div class="img-preview-wrap" id="imgPreview">
             <img class="img-preview-thumb" id="imgThumb" src="" alt="">
             <span class="img-preview-name" id="imgName"></span>
             <button class="img-preview-remove" id="imgRemove" title="Remove">✕</button>
-        </div>
-
-        <!-- Vibrant animated gradient background -->
-        <div class="bottom-glow" id="bottomGlow">
-            <div class="aurora1"></div>
-            <div class="aurora2"></div>
-            <div class="aurora3"></div>
-        </div>
-
-        <!-- Empty / welcome state -->
-        <div class="chat-empty-state" id="chatEmptyState">
-            <h2 id="emptyStateText">Ask away!</h2>
-            <p class="greet-sub" id="emptyStateSub">Your personal AI, ready for anything.</p>
         </div>
 
         <!-- Input dock -->
@@ -2302,9 +2312,9 @@
 
     // Personalise the empty state greeting with random animated greetings + typewriter
     (function() {
-        const drawerName = document.querySelector('.drawer-uname');
-        const name = drawerName ? drawerName.textContent.trim() : null;
-        const n = name || 'you';
+        // _jarvusUsername is injected by Jinja — always correct, no DOM timing issue
+        const name = (_jarvusUsername && _jarvusUsername.trim()) ? _jarvusUsername.trim() : null;
+        const n = name ? (name.charAt(0).toUpperCase() + name.slice(1)) : 'there';
 
         const greetings = [
             { main: `Good to see you, ${n}`,           sub: `Brain's warmed up — what do you need?` },
