@@ -1105,57 +1105,56 @@
         .bottom-glow {
             position: fixed;
             bottom: 0; left: 0; right: 0;
-            height: 260px;
+            height: 55vh;
             pointer-events: none;
             z-index: 5;
             background: linear-gradient(to top,
-                rgba(15, 20, 40, 0.92) 0%,
-                rgba(10, 15, 35, 0.65) 40%,
+                #0a1628 0%,
+                #0d1f3c 18%,
+                #0f2444 32%,
+                rgba(10, 22, 48, 0.55) 60%,
                 transparent 100%
             );
             opacity: 1;
-            transition: opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
         }
         [data-theme="light"] .bottom-glow {
             background: linear-gradient(to top,
-                rgba(245, 245, 250, 0.95) 0%,
-                rgba(245, 245, 250, 0.6) 40%,
+                rgba(235, 240, 255, 1) 0%,
+                rgba(235, 240, 255, 0.75) 35%,
                 transparent 100%
             );
         }
-        .bottom-glow.faded { opacity: 0; }
+        .bottom-glow.faded {
+            opacity: 0;
+            pointer-events: none;
+        }
 
         /* ════ EMPTY / WELCOME STATE ════ */
         .chat-empty-state {
-            position: absolute;
+            position: fixed;
             top: 50%; left: 50%;
-            transform: translate(-50%, -60%);
+            transform: translate(-50%, -50%);
             display: flex; flex-direction: column;
-            align-items: center; gap: 18px;
+            align-items: center;
             pointer-events: none;
-            transition: opacity 0.35s ease, transform 0.35s ease;
-            z-index: 4;
+            z-index: 6;
+            width: 100%;
+            padding: 0 32px;
+            opacity: 1;
+            transition: opacity 0.3s ease;
         }
         .chat-empty-state.hidden {
             opacity: 0;
-            transform: translate(-50%, -68%);
-            pointer-events: none;
-        }
-        .jarvis-spark {
-            width: 44px; height: 44px;
-            animation: sparkFloat 3s ease-in-out infinite;
-        }
-        @keyframes sparkFloat {
-            0%, 100% { transform: translateY(0px) scale(1); }
-            50% { transform: translateY(-6px) scale(1.06); }
         }
         .chat-empty-state h2 {
-            font-size: 26px;
+            font-size: 28px;
             font-weight: 300;
-            letter-spacing: -0.3px;
+            letter-spacing: -0.2px;
             color: var(--text-primary);
             text-align: center;
             line-height: 1.2;
+            margin: 0;
         }
 
         /* ════════════════════════════════
@@ -1759,19 +1758,6 @@
 
         <!-- Empty / welcome state (Gemini style) -->
         <div class="chat-empty-state" id="chatEmptyState">
-            <svg class="jarvis-spark" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                    <linearGradient id="sparkGrad" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
-                        <stop offset="0%" stop-color="#a78bfa"/>
-                        <stop offset="35%" stop-color="#60a5fa"/>
-                        <stop offset="65%" stop-color="#34d399"/>
-                        <stop offset="100%" stop-color="#fbbf24"/>
-                    </linearGradient>
-                </defs>
-                <!-- 4-pointed star shape like Gemini -->
-                <path d="M22 2 C22 2 23.5 14 30 22 C23.5 30 22 42 22 42 C22 42 20.5 30 14 22 C20.5 14 22 2 22 2Z" fill="url(#sparkGrad)"/>
-                <path d="M2 22 C2 22 14 23.5 22 30 C30 23.5 42 22 42 22 C42 22 30 20.5 22 14 C14 20.5 2 22 2 22Z" fill="url(#sparkGrad)" opacity="0.85"/>
-            </svg>
             <h2 id="emptyStateText">Ask away!</h2>
         </div>
 
