@@ -372,10 +372,7 @@ html,body {
   padding:11px 13px; border-radius:12px;
   background:var(--surface2); border:1px solid var(--border);
 }
-.version-dot {
-  width:8px; height:8px; border-radius:50%;
-  background:var(--accent); flex-shrink:0;
-}
+.version-dot { width:16px;height:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center; }
 .version-info { flex:1; }
 .version-label { font-size:13.5px; font-weight:600; }
 .version-time { font-size:11px; color:var(--text2); margin-top:2px; }
@@ -424,7 +421,7 @@ html,body {
 
       <!-- Empty state (shown when no messages) -->
       <div id="empty-state" {% if messages %}style="display:none"{% endif %}>
-        <div class="icon">🌐</div>
+        <div class="icon"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>
         <h3>Build your website</h3>
         <p>Describe what you want and I'll generate the code instantly.</p>
         <div class="suggestion-chips">
@@ -456,7 +453,7 @@ html,body {
 
   <!-- FILE UPDATE BANNER -->
   <div id="file-update-banner">
-    <span>📁</span>
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
     <span id="file-update-text">Files updated</span>
     <button onclick="openPanel('files')" style="margin-left:auto;background:var(--green);color:#fff;border:none;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;">View</button>
   </div>
@@ -500,7 +497,7 @@ html,body {
 
 <!-- FILES PANEL -->
 <div class="panel-overlay" id="files-overlay" onclick="handleOverlayClick(event,'files')">
-  <div class="panel-sheet" id="files-sheet">
+  <div class="panel-sheet" id="files-sheet" style="max-height:86dvh;">
     <div class="panel-handle"></div>
     <div class="panel-header">
       <span class="panel-title">Files</span>
@@ -529,7 +526,7 @@ html,body {
 
 <!-- PREVIEW PANEL -->
 <div class="panel-overlay" id="preview-overlay" onclick="handleOverlayClick(event,'preview')">
-  <div class="panel-sheet" id="preview-sheet" style="max-height:92dvh;">
+  <div class="panel-sheet" id="preview-sheet" style="max-height:96dvh;height:96dvh;">
     <div class="panel-handle"></div>
     <div class="panel-header">
       <span class="panel-title">Preview</span>
@@ -552,7 +549,7 @@ html,body {
 
 <!-- HISTORY PANEL -->
 <div class="panel-overlay" id="history-overlay" onclick="handleOverlayClick(event,'history')">
-  <div class="panel-sheet" id="history-sheet">
+  <div class="panel-sheet" id="history-sheet" style="max-height:86dvh;">
     <div class="panel-handle"></div>
     <div class="panel-header">
       <span class="panel-title">Version History</span>
@@ -770,7 +767,12 @@ function renderFileList(files) {
   files.forEach(f => {
     const ext = f.filename.split('.').pop().toLowerCase();
     const iconClass = ['html','css','js'].includes(ext) ? ext : 'other';
-    const icons = { html:'🌐', css:'🎨', js:'⚡', other:'📄' };
+    const icons = {
+      html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ef6444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>',
+      css:  '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>',
+      js:   '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#eab308" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>',
+      other:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#7c6dfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>'
+    };
 
     const item = document.createElement('div');
     item.className = 'file-item';
@@ -854,7 +856,7 @@ async function loadVersions() {
       const item = document.createElement('div');
       item.className = 'version-item';
       item.innerHTML = `
-        <div class="version-dot"></div>
+        <div class="version-dot"><svg viewBox="0 0 24 24" width="10" height="10" fill="var(--accent)"><circle cx="12" cy="12" r="6"/></svg></div>
         <div class="version-info">
           <div class="version-label">Version ${versions.length - i}</div>
           <div class="version-time">${v.created_at || v.label || ''}</div>
