@@ -278,7 +278,7 @@ def _call_nvidia(messages, current_files):
                 "Content-Type": "application/json"
             },
             json={
-                "model": "moonshotai/kimi-k2",
+                "model": "moonshotai/kimi-k2.6",
                 "messages": [{"role": "system", "content": SYSTEM_PROMPT}] + api_messages,
                 "max_tokens": 8192,
                 "temperature": 0.3,
