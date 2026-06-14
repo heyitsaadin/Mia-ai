@@ -1,41 +1,43 @@
 """
-website_bp.py  –  Website Creation Blueprint for Jarvis
+website_bp.py  –  Website Creation Blueprint for Mia AI
 Handles all /project/website/* routes.
 Register in app.py with:
     from website_bp import website_bp
     app.register_blueprint(website_bp)
+
+AI Backend: NVIDIA NIM — deepseek-ai/deepseek-v4-pro
+Uses SSE streaming to bypass Vercel's 10s serverless timeout.
+Checkpoints are emitted at each stage so the frontend can show progress.
 """
 
 import os
 import json
+import re
+import io
+import zipfile
 import secrets
-import requests
 from datetime import datetime, timezone, timedelta
 from flask import (
     Blueprint, render_template, request, session,
-    redirect, jsonify
+    redirect, jsonify, Response, stream_with_context
 )
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from openai import OpenAI
 
 website_bp = Blueprint("website_bp", __name__)
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
-# ─── DB helpers (reuse app.py's pool via import) ────────────────────────────
+# ─── NVIDIA NIM client ──────────────────────────────────────────────────────
 
-def _get_pool():
-    """Lazily grab the connection pool that app.py already created."""
-    from app import db_pool
-    return db_pool
+def _nvidia_client():
+    return OpenAI(
+        base_url="https://integrate.api.nvidia.com/v1",
+        api_key=os.environ.get("NVIDIA_API_KEY", ""),
+    )
 
-def _db():
-    return _get_pool().getconn()
-
-def _ret(conn):
-    _get_pool().putconn(conn)
-
-# ─── One-time migration (called from init_website_db) ───────────────────────
+# ─── DB helpers ─────────────────────────────────────────────────────────────
 
 def init_website_db():
     """Run safe migrations. Called once at import time."""
@@ -43,13 +45,11 @@ def init_website_db():
     conn = get_db()
     cur = conn.cursor()
 
-    # Add 'type' column to projects if missing
     cur.execute("""
         ALTER TABLE projects
         ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'general'
     """)
 
-    # Website files table
     cur.execute("""
         CREATE TABLE IF NOT EXISTS website_files (
             id          SERIAL PRIMARY KEY,
@@ -62,7 +62,6 @@ def init_website_db():
         )
     """)
 
-    # Website chat messages (separate from regular chat_sessions)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS website_chats (
             id          SERIAL PRIMARY KEY,
@@ -74,7 +73,6 @@ def init_website_db():
         )
     """)
 
-    # Website version snapshots
     cur.execute("""
         CREATE TABLE IF NOT EXISTS website_versions (
             id          SERIAL PRIMARY KEY,
@@ -90,8 +88,6 @@ def init_website_db():
     cur.close()
     return_db(conn)
 
-
-# ─── DB helpers ─────────────────────────────────────────────────────────────
 
 def _get_project(project_id, username):
     from app import get_db, return_db
@@ -178,11 +174,10 @@ def _save_version(project_id, username, files, label=None):
     now = datetime.now(IST).strftime("%Y-%m-%d %H:%M")
     if not label:
         label = now
-    snapshot = json.dumps(files)
     cur.execute("""
         INSERT INTO website_versions (project_id, username, label, snapshot, created_at)
         VALUES (%s, %s, %s, %s, %s)
-    """, (project_id, username, label, snapshot, now))
+    """, (project_id, username, label, json.dumps(files), now))
     conn.commit()
     cur.close()
     return_db(conn)
@@ -222,9 +217,9 @@ def _restore_version(version_id, project_id, username):
     return True
 
 
-# ─── NVIDIA call ────────────────────────────────────────────────────────────
+# ─── System prompt ───────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """You are an expert web developer AI inside a website builder called Jarvis.
+SYSTEM_PROMPT = """You are an expert web developer AI inside a website builder called Mia AI.
 
 Your ONLY job is to generate or update website files based on the user's request.
 
@@ -257,56 +252,105 @@ Rules:
 - If the user sends a follow-up, look at the current_files context and build upon it."""
 
 
-def _call_nvidia(messages, current_files):
-    api_key = os.environ.get("GROQ_API_KEY", "")
-    if not api_key:
-        return None, "GROQ_API_KEY not set"
+# ─── SSE streaming generator ─────────────────────────────────────────────────
 
-    # Build context of current files for the AI
+def _sse(payload: dict) -> str:
+    """Format a dict as an SSE data line."""
+    return f"data: {json.dumps(payload)}\n\n"
+
+
+def _stream_deepseek(messages, current_files):
+    """
+    Generator that yields SSE events:
+      checkpoint  →  { checkpoint, label }
+      token       →  { token }           (raw streaming token, optional use)
+      done        →  { checkpoint:'done', result: {message, files} }
+      complete    →  { checkpoint:'complete', files, message }  (after DB save)
+      error       →  { error }
+    """
+    api_key = os.environ.get("NVIDIA_API_KEY", "")
+    if not api_key:
+        yield _sse({"error": "NVIDIA_API_KEY not set in environment."})
+        return
+
+    # ── Build files context ──────────────────────────────────────────────────
     files_context = ""
     if current_files:
         files_context = "\n\nCURRENT FILES IN PROJECT:\n"
         for f in current_files:
-            preview = f["content"][:500] + ("..." if len(f["content"]) > 500 else "")
-            files_context += f"\n--- {f['filename']} ---\n{preview}\n"
+            # Send full content so DeepSeek can edit correctly
+            files_context += f"\n--- {f['filename']} ---\n{f['content']}\n"
 
-    # Inject files context into last user message
+    # ── Build message history for API ────────────────────────────────────────
     api_messages = []
     for i, m in enumerate(messages):
         role = "user" if m["sender"] == "You" else "assistant"
         content = m["text"]
+        # Inject file context into the last user message only
         if i == len(messages) - 1 and role == "user" and files_context:
             content = content + files_context
         api_messages.append({"role": role, "content": content})
 
+    # ── Checkpoint 1: Starting ───────────────────────────────────────────────
+    yield _sse({"checkpoint": "thinking", "label": "🧠 DeepSeek is planning your website…"})
+
     try:
-        from groq import Groq
-        client = Groq(api_key=api_key)
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+        client = _nvidia_client()
+        stream = client.chat.completions.create(
+            model="deepseek-ai/deepseek-v4-pro",
             messages=[{"role": "system", "content": SYSTEM_PROMPT}] + api_messages,
-            max_tokens=8192,
+            max_tokens=16384,
             temperature=0.3,
+            top_p=0.95,
+            stream=True,
         )
-        raw = completion.choices[0].message.content.strip()
+
+        full_text = ""
+        files_checkpoint_sent = False
+        char_count = 0
+
+        for chunk in stream:
+            delta = chunk.choices[0].delta.content or ""
+            if not delta:
+                continue
+
+            full_text += delta
+            char_count += len(delta)
+
+            # ── Checkpoint 2: once "files" key appears ───────────────────────
+            if not files_checkpoint_sent and '"files"' in full_text:
+                files_checkpoint_sent = True
+                yield _sse({"checkpoint": "writing", "label": "✍️ Writing your files…"})
+
+            # Stream raw token to frontend (frontend can show live char counter etc.)
+            yield _sse({"token": delta, "chars": char_count})
+
+        # ── Checkpoint 3: Parsing ────────────────────────────────────────────
+        yield _sse({"checkpoint": "parsing", "label": "⚙️ Processing response…"})
+
+        raw = full_text.strip()
 
         # Strip markdown fences if model wraps response
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1] if "\n" in raw else raw
             raw = raw.rsplit("```", 1)[0].strip()
 
+        # Handle case where model outputs json fence specifically
+        if raw.startswith("json"):
+            raw = raw[4:].strip()
+
         parsed = json.loads(raw)
-        return parsed, None
 
-    except requests.exceptions.Timeout:
-        return None, "Request timed out. Try a simpler request."
+        # ── Checkpoint 4: Parsed OK, hand back to route for DB save ─────────
+        yield _sse({"checkpoint": "done", "result": parsed})
+
     except json.JSONDecodeError as e:
-        return None, f"AI returned invalid format: {str(e)}"
+        yield _sse({"error": f"AI returned invalid JSON: {str(e)}. Raw length: {len(full_text)} chars."})
     except Exception as e:
-        return None, str(e)
+        yield _sse({"error": str(e)})
 
 
-# ─── Routes ─────────────────────────────────────────────────────────────────
+# ─── Routes ──────────────────────────────────────────────────────────────────
 
 @website_bp.route("/project/website/<int:project_id>")
 def website_editor(project_id):
@@ -329,6 +373,17 @@ def website_editor(project_id):
 
 @website_bp.route("/project/website/<int:project_id>/send", methods=["POST"])
 def website_send(project_id):
+    """
+    Streams the AI response back as SSE events.
+    The frontend should consume this with fetch + ReadableStream (not EventSource,
+    since this is a POST). Checkpoints:
+      thinking  → model started
+      writing   → "files" key spotted in stream
+      parsing   → stream complete, parsing JSON
+      done      → parsed OK (result payload included)
+      saving    → DB writes happening
+      complete  → all done, updated file list included
+    """
     if "user" not in session:
         return jsonify({"error": "not_logged_in"}), 401
 
@@ -342,47 +397,72 @@ def website_send(project_id):
     if not user_msg:
         return jsonify({"error": "empty"}), 400
 
-    # Load existing chat + files
     messages = _get_chat(project_id, username)
     current_files = _get_files(project_id, username)
-
-    # Append user message
     messages.append({"sender": "You", "text": user_msg})
 
-    # Call NVIDIA
-    result, error = _call_nvidia(messages, current_files)
+    def generate():
+        result = None
+        error = None
 
-    if error:
-        messages.append({"sender": "Jarvis", "text": f"Sorry, something went wrong: {error}"})
+        # ── Stream from DeepSeek ─────────────────────────────────────────────
+        for line in _stream_deepseek(messages, current_files):
+            yield line
+
+            # Parse each SSE line to capture the final result
+            if line.startswith("data: "):
+                try:
+                    payload = json.loads(line[6:])
+                    if "result" in payload:
+                        result = payload["result"]
+                    if "error" in payload:
+                        error = payload["error"]
+                except Exception:
+                    pass
+
+        # ── Checkpoint 5: Saving to DB ───────────────────────────────────────
+        yield _sse({"checkpoint": "saving", "label": "💾 Saving files to database…"})
+
+        if result:
+            ai_message = result.get("message", "Done! Here's what I built.")
+            new_files = result.get("files", [])
+
+            for f in new_files:
+                fname = f.get("filename", "").strip()
+                fcontent = f.get("content", "")
+                if fname and fcontent:
+                    _save_file(project_id, username, fname, fcontent)
+
+            if new_files:
+                all_files = _get_files(project_id, username)
+                _save_version(project_id, username, all_files)
+
+            messages.append({"sender": "Mia", "text": ai_message})
+        else:
+            err_text = error or "Something went wrong."
+            ai_message = f"Sorry, something went wrong: {err_text}"
+            messages.append({"sender": "Mia", "text": ai_message})
+
         _save_chat(project_id, username, messages)
-        return jsonify({"error": error, "message": error}), 500
 
-    ai_message = result.get("message", "Done! Here's what I built.")
-    new_files = result.get("files", [])
+        # ── Checkpoint 6: All done ───────────────────────────────────────────
+        updated_files = _get_files(project_id, username)
+        yield _sse({
+            "checkpoint": "complete",
+            "message": ai_message,
+            "files": updated_files,
+            "error": error,
+        })
 
-    # Save each file
-    for f in new_files:
-        fname = f.get("filename", "").strip()
-        fcontent = f.get("content", "")
-        if fname and fcontent:
-            _save_file(project_id, username, fname, fcontent)
-
-    # Save version snapshot if files changed
-    if new_files:
-        all_files = _get_files(project_id, username)
-        _save_version(project_id, username, all_files)
-
-    # Append AI message
-    messages.append({"sender": "Jarvis", "text": ai_message})
-    _save_chat(project_id, username, messages)
-
-    # Return updated files list
-    updated_files = _get_files(project_id, username)
-
-    return jsonify({
-        "message": ai_message,
-        "files": updated_files,
-    }), 200
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",   # prevent nginx/Vercel buffering
+            "Connection": "keep-alive",
+        }
+    )
 
 
 @website_bp.route("/project/website/<int:project_id>/files")
@@ -416,7 +496,7 @@ def website_file_content(project_id, filename):
 
 @website_bp.route("/project/website/<int:project_id>/preview")
 def website_preview(project_id):
-    """Serve the assembled website as a raw HTML page for iframe."""
+    """Serve the assembled website as raw HTML for the iframe."""
     if "user" not in session:
         return "Unauthorized", 401
     username = session["user"]
@@ -427,46 +507,49 @@ def website_preview(project_id):
         align-items:center;justify-content:center;height:100vh;margin:0;background:#0a0a0a;color:#666;">
         <p>No files yet. Start chatting to build your website!</p></body></html>"""
 
-    # Find index.html
+    # Find index.html (prefer root-level, then folder-level)
     index = next((f for f in files if f["filename"] == "index.html"), None)
+    if not index:
+        index = next((f for f in files if f["filename"].endswith("/index.html")), None)
     if not index:
         index = files[0]
 
     html = index["content"]
-    index_folder = index["filename"].rsplit("/", 1)[0] if "/" in index["filename"] else ""
 
-    # Build lookup: basename → content (handles folder-prefixed filenames)
+    # Build lookup: basename → content
     file_map = {}
     for f in files:
         if f["filename"] == index["filename"]:
             continue
         basename = f["filename"].rsplit("/", 1)[-1]
         file_map[basename] = f["content"]
-        # Also store full path as key for exact matches
         file_map[f["filename"]] = f["content"]
 
-    import re
-
-    # Inline all <link rel="stylesheet" href="..."> tags
+    # Inline CSS
     def replace_css(m):
         href = m.group(1)
-        basename = href.rsplit("/", 1)[-1]
-        content = file_map.get(href) or file_map.get(basename)
-        if content:
-            return f'<style>{content}</style>'
-        return m.group(0)
-    html = re.sub(r'<link[^>]+rel=["\']stylesheet["\'][^>]+href=["\']([^"\']+)["\'][^>]*/?>', replace_css, html, flags=re.IGNORECASE)
-    html = re.sub(r'<link[^>]+href=["\']([^"\']+)["\'][^>]+rel=["\']stylesheet["\'][^>]*/?>', replace_css, html, flags=re.IGNORECASE)
+        content = file_map.get(href) or file_map.get(href.rsplit("/", 1)[-1])
+        return f"<style>{content}</style>" if content else m.group(0)
 
-    # Inline all <script src="..."> tags
+    html = re.sub(
+        r'<link[^>]+rel=["\']stylesheet["\'][^>]+href=["\']([^"\']+)["\'][^>]*/?>',
+        replace_css, html, flags=re.IGNORECASE
+    )
+    html = re.sub(
+        r'<link[^>]+href=["\']([^"\']+)["\'][^>]+rel=["\']stylesheet["\'][^>]*/?>',
+        replace_css, html, flags=re.IGNORECASE
+    )
+
+    # Inline JS
     def replace_js(m):
         src = m.group(1)
-        basename = src.rsplit("/", 1)[-1]
-        content = file_map.get(src) or file_map.get(basename)
-        if content:
-            return f'<script>{content}</script>'
-        return m.group(0)
-    html = re.sub(r'<script[^>]+src=["\']([^"\']+)["\'][^>]*></script>', replace_js, html, flags=re.IGNORECASE)
+        content = file_map.get(src) or file_map.get(src.rsplit("/", 1)[-1])
+        return f"<script>{content}</script>" if content else m.group(0)
+
+    html = re.sub(
+        r'<script[^>]+src=["\']([^"\']+)["\'][^>]*></script>',
+        replace_js, html, flags=re.IGNORECASE
+    )
 
     return html, 200, {"Content-Type": "text/html; charset=utf-8"}
 
@@ -494,11 +577,9 @@ def website_restore(project_id, version_id):
 
 @website_bp.route("/project/website/<int:project_id>/download")
 def website_download(project_id):
-    """Download all files as a zip."""
+    """Download all project files as a zip."""
     if "user" not in session:
         return "Unauthorized", 401
-    import io
-    import zipfile
     username = session["user"]
     project = _get_project(project_id, username)
     files = _get_files(project_id, username)
@@ -523,7 +604,7 @@ def website_download(project_id):
     )
 
 
-# ─── Run migration at import ─────────────────────────────────────────────────
+# ─── Run migration at import ──────────────────────────────────────────────────
 
 try:
     init_website_db()
