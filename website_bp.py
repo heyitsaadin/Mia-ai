@@ -249,9 +249,9 @@ Rules:
 
 
 def _call_nvidia(messages, current_files):
-    api_key = os.environ.get("NVIDIA_API_KEY", "")
+    api_key = os.environ.get("GROQ_API_KEY", "")
     if not api_key:
-        return None, "NVIDIA_API_KEY not set"
+        return None, "GROQ_API_KEY not set"
 
     # Build context of current files for the AI
     files_context = ""
@@ -271,22 +271,15 @@ def _call_nvidia(messages, current_files):
         api_messages.append({"role": role, "content": content})
 
     try:
-        resp = requests.post(
-            "https://integrate.api.nvidia.com/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "moonshotai/kimi-k2.6",
-                "messages": [{"role": "system", "content": SYSTEM_PROMPT}] + api_messages,
-                "max_tokens": 8192,
-                "temperature": 0.3,
-            },
-            timeout=90
+        from groq import Groq
+        client = Groq(api_key=api_key)
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "system", "content": SYSTEM_PROMPT}] + api_messages,
+            max_tokens=8192,
+            temperature=0.3,
         )
-        resp.raise_for_status()
-        raw = resp.json()["choices"][0]["message"]["content"].strip()
+        raw = completion.choices[0].message.content.strip()
 
         # Strip markdown fences if model wraps response
         if raw.startswith("```"):
