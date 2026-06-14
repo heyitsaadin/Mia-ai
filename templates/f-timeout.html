@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Feature Unavailable</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      /* Changed to transparent so the custom active scale effect looks clean on mobile */
+      -webkit-tap-highlight-color: transparent; 
+    }
+    
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #ffffff;
+      overflow: hidden;
+      font-family: Inter, Arial, sans-serif;
+      color: black;
+    }
+    
+    .bg, .bg:before, .bg:after {
+      position: absolute;
+      inset: -20%;
+      content: "";
+      background-color: #DCE0DE; /* Fixed missing # */
+      animation: float 12s infinite linear;
+    }
+    
+    .bg:after {
+      animation-direction: reverse;
+      animation-duration: 18s;
+    }
+    
+    @keyframes float {
+      from { transform: rotate(0deg) scale(1); }
+      to { transform: rotate(360deg) scale(1.2); }
+    }
+
+    .card {
+      text-align: center;
+      position: relative;
+      z-index: 2;
+    }
+      
+    h1 {
+      font-size: 3.5rem;
+      margin: 20px 0 10px;
+      font-family: 'Bebas Neue', sans-serif;
+      color: grey;
+      letter-spacing: 1px;
+    }
+    
+    p {
+      opacity: .85;
+      line-height: 1.6;
+      font-family:'Barlow';
+    }
+    
+    /* --- Cool Animated Button --- */
+    button {
+      margin-top: 20px;
+      border: none;
+      padding: 14px 26px;
+      border-radius: 14px;
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      background: #000000;
+      color: white;
+      position: relative;
+      overflow: hidden;
+      z-index: 1;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      /* Combines transitions into a unified, smooth feel */
+      transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), 
+                  box-shadow 0.2s ease, 
+                  color 0.3s ease;
+    } 
+
+    /* The gradient layer that fades in smoothly behind the text on hover */
+    button::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #000, #000);
+      z-index: -1;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+
+    button:hover::before {
+      opacity: 1;
+    }
+
+    /* Fixed selector from .button:active to button:active */
+    button:active {
+      transform: translateY(-1px) scale(0.96); /* Snappy click down physics */
+      box-shadow: 0 4px 10px rgba(240, 132, 132, 0.2);
+    }
+
+    #status {
+      margin-top: 12px;
+      font-size: .95rem;
+      opacity: .8;
+    }
+  </style>
+</head>
+<body>
+
+<div class="bg"></div>
+
+<div class="card">
+  <div class="loader"></div>
+  <h1>We're Working On It</h1>
+  <p>
+    This feature isn't available right now<br>It's actively building & testing <br>Soon this feature Will be available
+  </p>
+
+  <button onclick="makeItFastly()">Alert Developer</button>
+  <div id="status"></div>
+</div>
+  
+<script>
+async function makeItFastly() {
+  const status = document.getElementById("status");
+  status.textContent = "Sending request...";
+
+  try {
+    const res = await fetch("/api/feature-request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        feature: "Unavailable Feature",
+        action: "make_it_fastly"
+      })
+    });
+
+    if (res.ok) {
+      status.textContent = "Request sent to the developers via Discord.";
+    } else {
+      status.textContent = "Request endpoint unavailable.";
+    }
+  } catch (e) {
+    status.textContent = "Could not send request.";
+  }
+}
+</script>
+
+</body>
+</html>
